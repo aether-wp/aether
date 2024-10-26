@@ -1,0 +1,23 @@
+.aether-switch-env {
+    display: block;
+    padding: 0 10px !important;
+}
+
+#wpadminbar {
+    .ab-top-menu > li {
+        &.hover > .ab-item,
+        &:not(.mobile):hover > .ab-item {
+            background: none !important;
+        }
+    }
+}
+
+#wp-admin-bar-aether-switch {
+    > .ab-item {
+        background-color: var(--aether-switcher-current-color) !important;
+    }
+
+    .current-env {
+        font-weight: bold;
+    }
+}
