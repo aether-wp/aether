@@ -15,3 +15,20 @@ jQuery(document).ready(function($) {
         }
     });
 });
+
+jQuery(document).ready(function($) {
+    $('.editor-link').on('click', function(e) {
+        const editor = $(this).data('editor');
+        
+        wp.apiFetch({
+            path: 'aether/v1/set-default-editor',
+            method: 'POST',
+            data: { editor }
+        }).then(() => {
+            $('.editor-links').each(function() {
+                $(this).find('.editor-link').hide();
+                $(this).find(`[data-editor="${editor}"]`).show();
+            });
+        });
+    });
+});

@@ -56,13 +56,20 @@ class Switcher
 				),
 			));
 
+			// Get current path and query string
+			$current_path = $_SERVER['REQUEST_URI'];
+
 			foreach ($environments as $index => $env) {
 				$is_current = $this->current_environment && $this->current_environment['url'] === $env['url'];
+				
+				// Build target URL with same path
+				$target_url = trailingslashit($env['url']) . ltrim($current_path, '/');
+
 				$admin_bar->add_menu(array(
 					'id'     => 'aether-switch-env-' . $index,
 					'parent' => 'aether-switch',
 					'title'  => $env['label'] . ($is_current ? ' (Current)' : ''),
-					'href'   => $env['url'],
+					'href'   => $target_url,
 					'meta'   => array(
 						'title' => __('Switch to ') . $env['label'],
 						'class' => 'aether-switch-env' . ($is_current ? ' current-env' : ''),

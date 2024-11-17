@@ -1,0 +1,206 @@
+$border-color: #e5e7eb;
+$text-color: #1d2327;
+$muted-text: #6b7280;
+$background-white: #fff;
+$background-gray: #f9fafb;
+$toggle-blue: #2563eb;
+$box-shadow: 0 2px 4px rgba(0,0,0,.04);
+
+%flex-center {
+  display: flex;
+  align-items: center;
+}
+
+%base-spacing {
+  margin: 0;
+  padding: 0;
+}
+
+%card {
+  background: $background-white;
+  border-radius: 8px;
+  box-shadow: $box-shadow;
+}
+
+.aether {
+  &-settings {
+    max-width: 960px;
+    @extend %base-spacing;
+    padding-top: 16px;
+  }
+
+  &-header {
+    @extend %card;
+    margin-bottom: 16px;
+    
+    h1 {
+      @extend %base-spacing;
+      @extend %flex-center;
+      color: $text-color;
+      font-size: 20px;
+      font-weight: 500;
+      gap: 8px;
+    }
+  }
+
+  &-content {
+    @extend %card;
+    border: 1px solid $border-color;
+    padding: 16px;
+  }
+
+  &-sections {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  &-section {
+    border-bottom: 1px solid $border-color;
+    padding-bottom: 16px;
+    
+    &:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    &-header {
+      padding-bottom: 12px;
+      
+      h2 {
+        @extend %base-spacing;
+        @extend %flex-center;
+        font-size: 15px;
+        font-weight: 500;
+        gap: 6px;
+      }
+    }
+  }
+
+  &-environments {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  &-color-picker {
+    width: 40px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid $border-color;
+    border-radius: 4px;
+  }
+
+  &-enable-media {
+    display: flex;
+    gap: 10px;
+  }
+
+  &-toggle {
+    position: relative;
+    display: flex;
+    width: 44px;
+    height: 22px;
+    
+    input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      
+      &:checked + .aether-toggle-slider {
+        background-color: $toggle-blue;
+        
+        &:before {
+          transform: translateX(22px);
+        }
+      }
+    }
+
+    &-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: $border-color;
+      transition: .3s;
+      border-radius: 22px;
+      width: 44px;
+      height: 22px;
+      
+      &:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 4px;
+        bottom: 4px;
+        background-color: $background-white;
+        transition: .3s;
+        border-radius: 50%;
+      }
+    }
+  }
+
+  &-submit {
+    margin-top: 16px !important;
+  }
+}
+
+.environment {
+  &-entry {
+    background: $background-gray;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid $border-color;
+  }
+
+  &-inputs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+
+    .aether-environment-input {
+        flex: 1;
+    }
+  }
+}
+
+.description {
+  color: $muted-text;
+  font-style: italic;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+#add-environment {
+  @extend %flex-center;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.remove-environment {
+  padding: 0 !important;
+  width: 32px;
+  height: 32px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashicons {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.form-table {
+  th {
+    display: block;
+    padding-bottom: 8px;
+    font-size: 14px;
+  }
+  
+  td {
+    display: block;
+    @extend %base-spacing;
+  }
+}

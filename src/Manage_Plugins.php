@@ -2,6 +2,10 @@
 
 namespace mklasen\Aether;
 
+use WP_Error;
+use WP_REST_Request;
+use WP_REST_Response;
+
 /**
  * Manage Plugins
  * 
@@ -42,24 +46,110 @@ class Manage_Plugins {
 	 * @return void
 	 */
 	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
-		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_action( 'update_option_aether_managed_plugins', array( $this, 'handle_plugin_settings_update' ), 10, 2 );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
+		// Initialize early to manage plugins before WordPress fully loads
+		add_action('plugins_loaded', array($this, 'init'), 0);
+	}
 
+	/**
+	 * Initialize the plugin management functionality
+	 */
+	public function init() {
 		$this->switcher = new Switcher();
 		$this->current_environment = $this->get_current_environment();
 		
+		// Set and process plugins before WordPress loads them
 		$this->set_plugins();
+		$this->manage_plugins();
+		$this->manage_network_plugins();
+
+
+		// Register other admin-related hooks
+		add_action('admin_menu', array($this, 'add_admin_menu'));
+		add_action('admin_init', array($this, 'register_settings'));
+		add_action('update_option_aether_managed_plugins', array($this, 'handle_plugin_settings_update'), 10, 2);
+		add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+		add_action('rest_api_init', array($this, 'register_rest_routes'));
+	}
+
+	/**
+	 * Register REST routes
+	 */
+	public function register_rest_routes() {
+		register_rest_route('aether/v1', '/manage-plugins', array(
+			'methods' => 'POST',
+			'callback' => array($this, 'handle_rest_update'),
+			'permission_callback' => array($this, 'check_rest_permissions'),
+			'args' => array(
+				'aether_managed_plugins' => array(
+					'required' => true,
+					'type' => 'object',
+					'sanitize_callback' => array($this, 'sanitize_plugin_settings')
+				)
+			)
+		));
+	}
+
+	/**
+	 * Check REST API permissions
+	 * 
+	 * @return bool
+	 */
+	public function check_rest_permissions(): bool {
+		return current_user_can('manage_options');
+	}
+
+	/**
+	 * Handle REST API updates
+	 * 
+	 * @param WP_REST_Request $request The request object
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function handle_rest_update(WP_REST_Request $request) {
+		$settings = $request->get_json_params();
+
+		if (!isset($settings['aether_managed_plugins'])) {
+			return new WP_Error(
+				'missing_settings',
+				__('No plugin settings provided', 'aether'),
+				array('status' => 400)
+			);
+		}
+
+		$sanitized_settings = $this->sanitize_plugin_settings($settings['aether_managed_plugins']);
+		update_option('aether_managed_plugins', $sanitized_settings);
+
+		// Process plugin changes immediately
+		$this->set_plugins();
+		$this->manage_plugins();
+		$this->manage_network_plugins();
+
+		return rest_ensure_response(array(
+			'success' => true,
+			'message' => __('Settings updated successfully', 'aether')
+		));
 	}
 
 	/**
 	 * Enqueue admin scripts
 	 */
 	public function enqueue_admin_scripts() {
-		if ( get_current_screen()->id === 'aether_page_aether-manage-plugins' ) {
-			wp_enqueue_script( 'aether-manage-plugins', plugins_url( 'assets/dist/js/main.js', dirname( __FILE__ ) ), array( 'jquery' ), '1.0', true );
-		}
+		// if ( get_current_screen()->id === 'aether_page_aether-manage-plugins' ) {
+			wp_enqueue_script( 
+				'aether-manage-plugins', 
+				plugins_url( 'assets/dist/js/main.js', dirname( __FILE__ ) ), 
+				array( 'wp-api-fetch' ),
+				'1.0',
+				true
+			);
+
+			wp_add_inline_script('aether-manage-plugins', 
+				'const aetherPlugins = ' . wp_json_encode(array(
+					'root' => esc_url_raw(rest_url('aether/v1/manage-plugins')),
+					'nonce' => wp_create_nonce('wp_rest')
+				)), 
+				'before'
+			);
+		// }
 	}
 
 	/**
@@ -91,7 +181,9 @@ class Manage_Plugins {
 	 */
 	public function register_settings() {
 		register_setting( 'aether_manage_plugins', 'aether_managed_plugins', array(
-			'sanitize_callback' => array( $this, 'sanitize_plugin_settings' )
+			'sanitize_callback' => array( $this, 'sanitize_plugin_settings' ),
+			'show_in_rest' => true,
+			'type' => 'object'
 		));
 	}
 
@@ -185,7 +277,7 @@ class Manage_Plugins {
 		?>
 		<div class="wrap">
 			<h1>Manage Environment Plugins</h1>
-			<form method="post" action="options.php">
+			<form method="post" action="options.php" id="aether-plugins-form">
 				<?php settings_fields( 'aether_manage_plugins' ); ?>
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
@@ -216,7 +308,7 @@ class Manage_Plugins {
 									<?php foreach ( $environments as $env ) : ?>
 										<label>
 											<input type="checkbox" 
-												class="enable-checkbox"
+												class="enable-checkbox auto-save"
 												data-plugin="<?php echo esc_attr( $plugin_file ); ?>"
 												data-env="<?php echo esc_attr( $env ); ?>"
 												name="aether_managed_plugins[<?php echo esc_attr( $plugin_file ); ?>][enable_on][]" 
@@ -230,7 +322,7 @@ class Manage_Plugins {
 									<?php foreach ( $environments as $env ) : ?>
 										<label>
 											<input type="checkbox" 
-												class="disable-checkbox"
+												class="disable-checkbox auto-save"
 												data-plugin="<?php echo esc_attr( $plugin_file ); ?>"
 												data-env="<?php echo esc_attr( $env ); ?>"
 												name="aether_managed_plugins[<?php echo esc_attr( $plugin_file ); ?>][disable_on][]" 
@@ -243,6 +335,7 @@ class Manage_Plugins {
 								<?php if (is_multisite()) : ?>
 								<td>
 									<input type="checkbox" 
+										class="auto-save"
 										name="aether_managed_plugins[<?php echo esc_attr( $plugin_file ); ?>][network]" 
 										value="1" 
 											<?php checked( isset( $plugin_settings['network'] ) ? $plugin_settings['network'] : false, true ); ?>>
@@ -250,6 +343,7 @@ class Manage_Plugins {
 								<?php endif; ?>
 								<td>
 									<input type="checkbox"
+										class="auto-save"
 										name="aether_managed_plugins[<?php echo esc_attr( $plugin_file ); ?>][track_todo]"
 										value="1"
 										<?php checked( isset( $plugin_settings['track_todo'] ) ? $plugin_settings['track_todo'] : false, true ); ?>>
@@ -269,7 +363,57 @@ class Manage_Plugins {
 						<?php endforeach; ?>
 					</tbody>
 				</table>
-				<?php submit_button(); ?>
+				<script>
+					jQuery(document).ready(function($) {
+						let saveTimeout;
+
+						async function saveSettings() {
+							const formData = $('#aether-plugins-form').serializeArray();
+							const settings = {};
+							
+							formData.forEach(item => {
+								const matches = item.name.match(/aether_managed_plugins\[(.*?)\]\[(.*?)\](\[\])?/);
+								if (matches) {
+									const [, plugin, key, isArray] = matches;
+									if (!settings[plugin]) settings[plugin] = {};
+									
+									if (isArray) {
+										if (!settings[plugin][key]) settings[plugin][key] = [];
+										settings[plugin][key].push(item.value);
+									} else {
+										settings[plugin][key] = item.value;
+									}
+								}
+							});
+
+							try {
+								const response = await wp.apiFetch({
+									path: 'aether/v1/manage-plugins',
+									method: 'POST',
+									data: {
+										aether_managed_plugins: settings
+									}
+								});
+
+								if (response.success) {
+									// Reload the page to reflect the new plugin states
+									// window.location.reload();
+								} else {
+									console.error('Error saving plugin settings:', response.message);
+								}
+							} catch (error) {
+								console.error('Error saving plugin settings:', error);
+							}
+						}
+
+						function debouncedSave() {
+							clearTimeout(saveTimeout);
+							saveTimeout = setTimeout(saveSettings, 500);
+						}
+
+						$('#aether-plugins-form').on('change', '.auto-save', debouncedSave);
+					});
+				</script>
 			</form>
 		</div>
 		<?php

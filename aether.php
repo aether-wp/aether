@@ -27,6 +27,8 @@ class Aether
         new Notes();
         new Todo();
         new Show_Hooks();
+        new What_File();
+        new Media();
     }
 
     private function is_herd()
